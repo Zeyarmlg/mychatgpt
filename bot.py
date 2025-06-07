@@ -71,7 +71,6 @@ def webhook():
         logger.info(f"Получен update от Telegram: {update_json}")
         update = Update.de_json(update_json, application.bot)
 
-        # Используем application._loop для запуска корутины
         future = run_coroutine_threadsafe(application.process_update(update), application._loop)
         future.result(timeout=10)
 
@@ -80,12 +79,10 @@ def webhook():
         logger.error(f"Ошибка в webhook: {e}")
         return "error", 500
 
-# --- Запуск Telegram и Flask ---
-async def run_bot():
+# --- Инициализация и запуск ---
+async def init_app():
     await application.initialize()
-    await application.bot.set_webhook(url=WEBHOOK_URL + "/webhook")
-    await application.start()
-    logger.info("Бот запущен и webhook установлен.")
+    return application._loop
 
 def start_flask():
     port = int(os.environ.get("PORT", 5000))
@@ -93,5 +90,19 @@ def start_flask():
     flask_app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    Thread(target=lambda: asyncio.run(run_bot())).start()
+    # Инициализация application и получение event loop
+    loop = asyncio.run(init_app())
+    application._loop = loop
+
+    # Установка webhook
+    asyncio.run(application.bot.set_webhook(url=WEBHOOK_URL + "/webhook"))
+    logger.info(f"Webhook установлен: {WEBHOOK_URL}/webhook")
+
+    # Запуск приложения Telegram в отдельном потоке
+    def start_bot():
+        asyncio.run(application.start())
+
+    Thread(target=start_bot).start()
+
+    # Запуск Flask (главный поток)
     start_flask()
