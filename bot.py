@@ -28,6 +28,8 @@ flask_app = Flask(__name__)
 
 # --- Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    import logging
+    logging.getLogger().info(f"/start вызван от пользователя: {update.effective_user.id}")
     await update.message.reply_text("Привет! Я GPT-бот, напиши мне что-нибудь.")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
