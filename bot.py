@@ -1,5 +1,6 @@
 import os
 import openai
+import logging
 from flask import Flask, request
 from telegram import Update
 from telegram.ext import (
@@ -8,6 +9,11 @@ from telegram.ext import (
 import asyncio
 from threading import Thread
 
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Переменные окружения
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Например: https://your-service.onrender.com
@@ -25,12 +31,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет! Я GPT-бот, напиши мне что-нибудь.")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        logger.warning("Пустое сообщение или не поддерживается.")
+        return
+
     user_msg = update.message.text
-    response = openai.ChatCompletion.create(
-        model="gpt-4",  # или gpt-3.5-turbo
-        messages=[{"role": "user", "content": user_msg}]
-    )
-    await update.message.reply_text(response.choices[0].message["content"])
+    logger.info(f"Сообщение от пользователя: {user_msg}")
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": user_msg}]
+        )
+        bot_reply = response.choices[0].message["content"]
+        await update.message.reply_text(bot_reply)
+    except Exception as e:
+        logger.error(f"Ошибка при обращении к OpenAI: {e}")
+        await update.message.reply_text("Произошла ошибка при обращении к OpenAI 😢")
 
 # --- Привязка обработчиков ---
 application.add_handler(CommandHandler("start", start))
@@ -43,23 +60,28 @@ def index():
 
 @flask_app.route("/webhook", methods=["POST"])
 def webhook():
-    update = Update.de_json(request.get_json(force=True), application.bot)
-    application.update_queue.put_nowait(update)
-    return "ok"
+    try:
+        update_json = request.get_json(force=True)
+        logger.info(f"Получен update от Telegram: {update_json}")
+        update = Update.de_json(update_json, application.bot)
+        application.update_queue.put_nowait(update)
+        return "ok"
+    except Exception as e:
+        logger.error(f"Ошибка при обработке webhook: {e}")
+        return "error", 500
 
 # --- Запуск ---
 async def run_bot():
     await application.initialize()
-    # Устанавливаем webhook в Telegram (одноразово при запуске)
     await application.bot.set_webhook(url=WEBHOOK_URL + "/webhook")
     await application.start()
-    # polling не нужен при вебхуке, поэтому не вызываем start_polling()
+    logger.info("Telegram bot запущен и webhook установлен.")
 
 def start_flask():
-    flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    port = int(os.environ.get("PORT", 5000))
+    logger.info(f"Flask сервер запущен на порту {port}")
+    flask_app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    # Запускаем Telegram Application в отдельном потоке
     Thread(target=lambda: asyncio.run(run_bot())).start()
-    # Запускаем Flask сервер в основном потоке
     start_flask()
