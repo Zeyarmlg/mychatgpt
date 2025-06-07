@@ -82,7 +82,8 @@ def webhook():
 # --- Инициализация и запуск ---
 async def init_app():
     await application.initialize()
-    return application._loop
+    loop = asyncio.get_running_loop()  # Получаем активный event loop
+    return loop
 
 def start_flask():
     port = int(os.environ.get("PORT", 5000))
@@ -92,7 +93,7 @@ def start_flask():
 if __name__ == "__main__":
     # Инициализация application и получение event loop
     loop = asyncio.run(init_app())
-    application._loop = loop
+    application._loop = loop  # Сохраняем цикл в объекте для webhook
 
     # Установка webhook
     asyncio.run(application.bot.set_webhook(url=WEBHOOK_URL + "/webhook"))
