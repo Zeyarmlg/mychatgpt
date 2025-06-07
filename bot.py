@@ -71,9 +71,9 @@ def webhook():
         logger.info(f"Получен update от Telegram: {update_json}")
         update = Update.de_json(update_json, application.bot)
 
-        # Корректно отправляем update в event loop Telegram-приложения
-        future = run_coroutine_threadsafe(application.process_update(update), application.loop)
-        future.result(timeout=10)  # Ждем максимум 10 сек, можно убрать или увеличить
+        # Используем application._loop для запуска корутины
+        future = run_coroutine_threadsafe(application.process_update(update), application._loop)
+        future.result(timeout=10)
 
         return "ok"
     except Exception as e:
