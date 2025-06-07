@@ -3,7 +3,9 @@ import logging
 import asyncio
 from flask import Flask, request
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+)
 from threading import Thread
 from asyncio import run_coroutine_threadsafe
 import openai
