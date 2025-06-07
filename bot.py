@@ -8,6 +8,7 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 )
 from threading import Thread
+from asyncio import run_coroutine_threadsafe
 
 # Логирование
 logging.basicConfig(level=logging.INFO)
@@ -69,7 +70,11 @@ def webhook():
         update_json = request.get_json(force=True)
         logger.info(f"Получен update от Telegram: {update_json}")
         update = Update.de_json(update_json, application.bot)
-        asyncio.create_task(application.process_update(update))  # ✅ Ключевая строка
+
+        # Корректно отправляем update в event loop Telegram-приложения
+        future = run_coroutine_threadsafe(application.process_update(update), application.loop)
+        future.result(timeout=10)  # Ждем максимум 10 сек, можно убрать или увеличить
+
         return "ok"
     except Exception as e:
         logger.error(f"Ошибка в webhook: {e}")
